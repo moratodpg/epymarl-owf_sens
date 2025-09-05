@@ -1,0 +1,25 @@
+env: owf_sens
+
+env_args:
+  obs_multiple: False
+  n_owt: 1
+  lev: 3
+  discount_reward: 0.95
+  component_costs: [[0.8, 1.8, 10], [3.8, 7.8, 30]]
+  global_costs: [1, 100, 600]
+  mobiliz_elements: 5
+  pf_constraint: 0.001
+  pf_sys_constraint: 1.0
+  sensor_deterioration: [[0.02, 0.98, 0.0], [0, 0.35, 0.65], [0.0, 0.0, 1.0]]
+  custom_param:
+    k_comp: null
+    lev: null
+  campaign_cost: false
+
+test_greedy: True
+test_nepisode: 100
+test_interval: 50000
+log_interval: 50000
+runner_log_interval: 10000
+learner_log_interval: 10000
+t_max: 2050000
