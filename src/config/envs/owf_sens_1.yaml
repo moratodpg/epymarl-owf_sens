@@ -4,7 +4,7 @@ env_args:
   obs_multiple: False
   n_owt: 1
   lev: 3
-  discount_reward: 0.95
+  discount_reward: 1.0
   component_costs: [[0.8, 1.8, 10], [3.8, 7.8, 30]]
   global_costs: [1, 100, 600]
   mobiliz_elements: 5
