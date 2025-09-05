@@ -5,7 +5,7 @@ import numpy as np
 
 from components.episode_buffer import EpisodeBatch
 from envs import REGISTRY as env_REGISTRY
-from envs import register_smac, register_smacv2
+# from envs import register_smac, register_smacv2
 
 
 # Based (very) heavily on SubprocVecEnv from OpenAI Baselines
@@ -23,10 +23,10 @@ class ParallelRunner:
 
         # registering both smac and smacv2 causes a pysc2 error
         # --> dynamically register the needed env
-        if self.args.env == "sc2":
-            register_smac()
-        elif self.args.env == "sc2v2":
-            register_smacv2()
+        # if self.args.env == "sc2":
+        #     register_smac()
+        # elif self.args.env == "sc2v2":
+        #     register_smacv2()
 
         env_fn = env_REGISTRY[self.args.env]
         env_args = [self.args.env_args.copy() for _ in range(self.batch_size)]
