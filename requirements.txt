@@ -24,7 +24,6 @@ sacred
 seaborn
 scipy
 six
-sk-video
 snakeviz
 tensorboard-logger
 torch
