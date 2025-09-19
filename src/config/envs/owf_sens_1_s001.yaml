@@ -8,12 +8,12 @@ env_args:
   component_costs: [[0.8, 1.8, 10], [3.8, 7.8, 30]]
   global_costs: [1, 100, 600]
   mobiliz_elements: 5
-  pf_constraint: 0.01
-  pf_sys_constraint: 1.0
+  pf_constraint: 1.0
+  pf_sys_constraint: 0.001
   sensor_deterioration: [[0.02, 0.98, 0.0], [0, 0.35, 0.65], [0.0, 0.0, 1.0]]
 
 test_greedy: True
-test_nepisode: 100
+test_nepisode: 1000
 test_interval: 50000
 log_interval: 50000
 runner_log_interval: 10000
@@ -22,7 +22,7 @@ t_max: 2050000
 
 use_wandb: True # Log results to W&B
 wandb_team: imp_marl # W&B team name
-wandb_project: owf_marl # W&B project name
+wandb_project: owf_sens_1 # W&B project name
 wandb_mode: "offline" # W&B mode (online/offline)
 wandb_save_model: False # Save models to W&B (only done if use_wandb is True and save_model is True)
 save_model: True # Save the models to disk
