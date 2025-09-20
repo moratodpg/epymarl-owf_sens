@@ -1,0 +1,16 @@
+env:
+  import_path: imp_marl.environments.owf_sens_env.OWF_Sens
+  config_file: owf_default_env.yaml
+agent:
+  preset: inspection
+  params:
+    inspection_interval: 20
+    n_components: 0
+runner:
+  n_agents: 2
+  pf_slice: [0, 2]
+  init_inspection_age: 61
+evaluation:
+  episodes: 1000
+output:
+  path: ../results/inspection_run_001.json

@@ -9,10 +9,13 @@ utility so they can be reused outside of the notebook context.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from concurrent.futures import ProcessPoolExecutor
 from itertools import product
 from typing import Any, Callable, Dict, List, Sequence, Tuple
 
+import importlib
 import numpy as np
+import os
 import time
 
 HeuristicFn = Callable[[int, np.ndarray, np.ndarray, Dict[str, Any]], np.ndarray]
@@ -183,7 +186,7 @@ class EnvRunner:
             self, 
             episodes: int = 100, 
             init_inspection_age: int = 61,
-            boot_iters: int = 2000,
+            boot_iters: int = 1,
             ci: float = 0.95,
     ) -> Dict[str, Any]:
         returns: List[float] = []
@@ -196,19 +199,21 @@ class EnvRunner:
         if returns:
             arr = np.asarray(returns, dtype=float)
             mean_val = float(np.mean(arr))
-            std_val  = float(np.std(arr))
-            min_val  = float(np.min(arr))
-            max_val  = float(np.max(arr))
+            std_val = float(np.std(arr))
+            min_val = float(np.min(arr))
+            max_val = float(np.max(arr))
 
-            # --- bootstrap for mean (percentile CI) ---
-            n = arr.size
-            stats = np.empty(boot_iters, dtype=float)
-            for b in range(boot_iters):
-                sample = np.random.choice(arr, size=n, replace=True)
-                stats[b] = np.mean(sample)
-            alpha = 1.0 - ci
-            lo, hi = np.quantile(stats, [alpha / 2, 1.0 - alpha / 2])
-            mean_ci = (float(lo), float(hi))
+            if boot_iters > 0:
+                n = arr.size
+                stats = np.empty(boot_iters, dtype=float)
+                for b in range(boot_iters):
+                    sample = np.random.choice(arr, size=n, replace=True)
+                    stats[b] = np.mean(sample)
+                alpha = 1.0 - ci
+                lo, hi = np.quantile(stats, [alpha / 2, 1.0 - alpha / 2])
+                mean_ci = (float(lo), float(hi))
+            else:
+                mean_ci = (mean_val, mean_val)
         else:
             mean_val = std_val = min_val = max_val = 0.0
             mean_ci = (0.0, 0.0)
@@ -230,32 +235,143 @@ class EnvRunner:
 # Hyper-parameter sweep
 # ---------------------------------------------------------------------------
 
+def _load_env(import_path: str, kwargs: Dict[str, Any]) -> Any:
+    module_path, _, attr = import_path.rpartition(".")
+    if not module_path:
+        raise ValueError(f"Invalid import path '{import_path}'")
+    module = importlib.import_module(module_path)
+    env_cls = getattr(module, attr)
+    return env_cls(**kwargs)
+
+
+def _slice_to_tuple(pf_slice: slice | None) -> Tuple[Any, Any, Any] | None:
+    if pf_slice is None:
+        return None
+    return (pf_slice.start, pf_slice.stop, pf_slice.step)
+
+
+def _tuple_to_slice(pf_slice_tuple: Tuple[Any, Any, Any] | None) -> slice | None:
+    if pf_slice_tuple is None:
+        return None
+    start, stop, step = pf_slice_tuple
+    return slice(start, stop, step)
+
+
+def _eval_one_combo(
+    keys: List[str],
+    values: Sequence[Any],
+    base_rules: List["RuleSpec"],
+    env_import: str,
+    env_kwargs: Dict[str, Any],
+    n_agents: int | None,
+    pf_slice_tuple: Tuple[Any, Any, Any] | None,
+    episodes: int,
+    init_inspection_age: int,
+    boot_iters: int,
+    ci: float,
+) -> Dict[str, Any]:
+    override = dict(zip(keys, values))
+    rules: List["RuleSpec"] = [(fn, {**params, **override}) for fn, params in base_rules]
+
+    env = _load_env(env_import, env_kwargs)
+    agent = HeuristicAgent(rules)
+    runner = EnvRunner(
+        env=env,
+        agent=agent,
+        n_agents=n_agents,
+        pf_slice=_tuple_to_slice(pf_slice_tuple),
+    )
+    metrics = runner.evaluate(
+        episodes=episodes,
+        init_inspection_age=init_inspection_age,
+        boot_iters=boot_iters,
+        ci=ci,
+    )
+    metrics.update({"params": override})
+    return metrics
+
 
 def grid_search(
     base_rules: List[RuleSpec],
     sweep: Dict[str, Sequence[Any]],
-    make_runner: Callable[[List[RuleSpec]], EnvRunner],
+    env_import: str,
+    env_kwargs: Dict[str, Any] | None = None,
+    *,
+    n_agents: int | None = None,
+    pf_slice: slice | None = None,
     episodes: int = 100,
     init_inspection_age: int = 61,
+    boot_iters: int = 2000,
+    ci: float = 0.95,
+    max_workers: int | None = None,
 ) -> List[Dict[str, Any]]:
-    """Grid search over heuristic parameter combinations."""
+    """Grid search over heuristic parameter combinations.
 
+    Args:
+        base_rules: Baseline rule list (function, params).
+        sweep: Dict mapping parameter names to value sequences.
+        env_import: Dotted path to environment class.
+        env_kwargs: kwargs passed to the environment constructor per worker.
+        n_agents: Optional number of agents to include.
+        pf_slice: Optional slice of the probability-of-failure vector.
+        episodes: Evaluation episodes per combination.
+        init_inspection_age: Initial inspection age fed to the runner.
+        max_workers: Process pool size (defaults to CPU count / len combos heuristics).
+    """
+
+    env_kwargs = dict(env_kwargs or {})
     keys = list(sweep.keys())
     combos = list(product(*[sweep[k] for k in keys]))
+    if not combos:
+        return []
 
-    results: List[Dict[str, Any]] = []
-    for values in combos:
-        rules: List[RuleSpec] = []
-        override = {k: v for k, v in zip(keys, values)}
-        for fn, params in base_rules:
-            merged = {**params, **override}
-            rules.append((fn, merged))
-        runner = make_runner(rules)
-        metrics = runner.evaluate(
-            episodes=episodes,
-            init_inspection_age=init_inspection_age,
-        )
-        results.append({"params": override, **metrics})
+    pf_slice_tuple = _slice_to_tuple(pf_slice)
+
+    if max_workers is not None:
+        worker_count = max(1, min(max_workers, len(combos)))
+    else:
+        cpu = os.cpu_count() or 1
+        worker_count = max(1, min(cpu, len(combos)))
+
+    if worker_count == 1:
+        results = [
+            _eval_one_combo(
+                keys,
+                values,
+                base_rules,
+                env_import,
+                env_kwargs,
+                n_agents,
+                pf_slice_tuple,
+                episodes,
+                init_inspection_age,
+                boot_iters,
+                ci,
+            )
+            for values in combos
+        ]
+    else:
+        results: List[Dict[str, Any]] = []
+        with ProcessPoolExecutor(max_workers=worker_count) as ex:
+            futures = [
+                ex.submit(
+                    _eval_one_combo,
+                    keys,
+                    values,
+                    base_rules,
+                    env_import,
+                    env_kwargs,
+                    n_agents,
+                    pf_slice_tuple,
+                    episodes,
+                    init_inspection_age,
+                    boot_iters,
+                    ci,
+                )
+                for values in combos
+            ]
+            for fut in futures:
+                results.append(fut.result())
 
     results.sort(key=lambda x: x["mean_return"], reverse=True)
     return results
