@@ -1,0 +1,37 @@
+{
+  "env": {
+    "import_path": "imp_marl.environments.owf_sens_env.OWF_Sens",
+    "kwargs": {}
+  },
+  "agent": {
+    "preset": "inspection",
+    "params": {
+      "inspection_interval": 1,
+      "n_components": 2
+    }
+  },
+  "runner": {
+    "n_agents": 2,
+    "pf_slice": [0, 2],
+    "init_inspection_age": 61
+  },
+  "evaluation": {
+    "episodes": 100
+  },
+  "sweep": {
+    "params": {
+      "inspection_interval": {
+        "range": [1, 3],
+        "step": 1
+      },
+      "n_components": {
+        "range": [0, 2],
+        "inclusive": true
+      }
+    },
+    "episodes": 1000
+  },
+  "output": {
+    "path": "results/test_sweep.json"
+  }
+}
