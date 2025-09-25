@@ -1,0 +1,24 @@
+# Choose mode via CLI: --mode eval  or  --mode optimize
+evaluate:
+  episodes: 100
+  init_inspection_age: 61
+  boot_iters: 2000
+  ci: 0.95
+  log: False
+
+optimize:
+  top_k: 3
+
+rules:
+  - name: inspect_topk
+    params:
+      inspection_interval: 4
+      n_components: 2
+    # Optional search space for optimization:
+    search_space:
+      inspection_interval: {range: [1, 20]}
+      n_components: [1, 2]
+
+  - name: repair_on_recent_inspection
+    params: {}               # this rule has no tunables; keep empty dict
+    # search_space: {}       # omitted => no optimization for this rule
