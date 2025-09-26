@@ -11,6 +11,7 @@ env_args:
   pf_constraint: 1.0
   pf_sys_constraint: 0.001
   sensor_deterioration: [[0.02, 0.98, 0.0], [0, 0.35, 0.65], [0.0, 0.0, 1.0]]
+  risk_reward: False
 
 test_greedy: True
 test_nepisode: 1000

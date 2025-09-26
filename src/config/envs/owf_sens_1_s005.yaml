@@ -9,7 +9,7 @@ env_args:
   global_costs: [1, 100, 600]
   mobiliz_elements: 5
   pf_constraint: 1.0
-  pf_sys_constraint: 0.01
+  pf_sys_constraint: 0.005
   sensor_deterioration: [[0.02, 0.98, 0.0], [0, 0.35, 0.65], [0.0, 0.0, 1.0]]
   risk_reward: False
 
