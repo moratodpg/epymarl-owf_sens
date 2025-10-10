@@ -1,0 +1,21 @@
+# Choose mode via CLI: --mode eval  or  --mode optimize
+evaluate:
+  episodes: 100
+  init_inspection_age: 61
+  boot_iters: 2000
+  ci: 0.95
+  log: False
+
+optimize:
+  top_k: 3
+
+rules:
+  - name: install_sensor
+    params: {}
+
+  - name: repair_on_window
+    params:
+      min_age: 10
+      max_age: 60
+    search_space:
+      min_age: {range: [5, 25, 5]}

@@ -1,0 +1,16 @@
+# Choose mode via CLI: --mode eval  or  --mode optimize
+evaluate:
+  episodes: 10000
+  init_inspection_age: 61
+  boot_iters: 2000
+  ci: 0.95
+  log: False
+
+optimize:
+  top_k: 3
+
+rules:
+  - name: inspect_topk
+    params:
+      inspection_interval: 18
+      n_components: 0
