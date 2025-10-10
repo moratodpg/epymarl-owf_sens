@@ -31,6 +31,7 @@ def heuristic_inspect_topk(
     inspections: np.ndarray,
     pf_comp: np.ndarray,
     params: Dict[str, Any],
+    sensor_deactivated: Optional[Sequence[bool]] = None,
 ) -> np.ndarray:
     """Inspect the components with the highest failure probability."""
 
@@ -49,6 +50,7 @@ def heuristic_repair_on_recent_inspection(
     inspections: np.ndarray,
     pf_comp: np.ndarray,
     params: Dict[str, Any],
+    sensor_deactivated: Optional[Sequence[bool]] = None,
 ) -> np.ndarray:
     """Repair components that were just inspected on the previous step."""
 
@@ -62,6 +64,7 @@ def heuristic_monitoring_install_topk(
     inspections: np.ndarray,
     pf_comp: np.ndarray,
     params: Dict[str, Any],
+    sensor_deactivated: Optional[Sequence[bool]] = None,
 ) -> np.ndarray:
     """Install monitoring on the top-k failure probabilities at a fixed cadence."""
 
@@ -80,15 +83,46 @@ def heuristic_repair_on_window(
     inspections: np.ndarray,
     pf_comp: np.ndarray,
     params: Dict[str, Any],
+    sensor_deactivated: Optional[Sequence[bool]] = None,
 ) -> np.ndarray:
     """Repair when the time since last inspection falls inside a target window."""
 
-    min_age = int(params.get("min_age", 16))
+    min_age = int(params.get("min_age", 10))
     max_age = int(params.get("max_age", 60))
     actions = np.zeros_like(pf_comp, dtype=int)
 
     mask = (inspections > min_age) & (inspections < max_age)
     actions[mask] = 4
+    return actions
+
+def heuristic_repair_on_pf(
+    timestep: int,
+    inspections: np.ndarray,
+    pf_comp: np.ndarray,
+    params: Dict[str, Any],
+    sensor_deactivated: Optional[Sequence[bool]] = None,
+) -> np.ndarray:
+    """Repair when the time since the pf exceeds the target."""
+
+    pf_target = float(params.get("pf_target", 0.001))
+    actions = np.zeros_like(pf_comp, dtype=int)
+
+    mask = (pf_comp > pf_target)
+    actions[mask] = 4
+    return actions
+
+def heuristic_install_sensor(
+    timestep: int,
+    inspections: np.ndarray,
+    pf_comp: np.ndarray,
+    params: Dict[str, Any],
+    sensor_deactivated: Optional[Sequence[bool]] = None,
+) -> np.ndarray:
+    """Install sensors if not already installed."""
+    actions = np.zeros_like(pf_comp, dtype=int)
+    for i, sensor_comp in enumerate(sensor_deactivated):
+        if sensor_comp == 1.0:
+            actions[i] = 1  # Install sensor
     return actions
 
 # ---------------------------------------------------------------------------
@@ -107,10 +141,11 @@ class HeuristicAgent:
         timestep: int,
         inspections: np.ndarray,
         pf_comp: np.ndarray,
+        sensor_deactivated: Optional[Sequence[bool]] = None,
     ) -> np.ndarray:
         actions = np.zeros_like(pf_comp, dtype=int)
         for rule_fn, params in self.rules:
-            proposal = rule_fn(timestep, inspections, pf_comp, params)
+            proposal = rule_fn(timestep, inspections, pf_comp, params, sensor_deactivated)
             overwrite = proposal != 0
             actions[overwrite] = proposal[overwrite]
         return actions
@@ -182,7 +217,7 @@ class EnvRunner:
         return np.concatenate(pf_all)  # shape: (n_agents * lev,)
 
     def run_episode(self, init_inspection_age: int = 61, log: bool = False) -> float:
-        _ = self.env.reset()
+        obs = self.env.reset()
         agent_list = list(self.env.agent_list)
         n = len(agent_list) 
         inspections = np.ones(n, dtype=int) * int(init_inspection_age)
@@ -192,10 +227,11 @@ class EnvRunner:
 
         while not done:
             pf = self._pf_components()
-            actions_vec = self.agent.act(self.env.time_step, inspections, pf)
+            sensor_deactivated = [obs[agent][-3] for agent in self.env.agent_list]
+            actions_vec = self.agent.act(self.env.time_step, inspections, pf, sensor_deactivated)
             actions = actions_to_dict(actions_vec, agent_list[:n])
 
-            _, reward, done, info = self.env.step(actions)
+            obs, reward, done, info = self.env.step(actions)
             
             inspections = np.asarray(info["inspections"], dtype=int)
             inspections = inspections[:, :-1].flatten()  # shape: (n_agents * (lev-1),)

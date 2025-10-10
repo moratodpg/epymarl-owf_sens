@@ -20,6 +20,8 @@ from heuristics_library import (
     heuristic_repair_on_recent_inspection,
     heuristic_monitoring_install_topk,
     heuristic_repair_on_window,
+    heuristic_install_sensor,
+    heuristic_repair_on_pf,
 )
 
 # ---------- Registry for rule names -> functions ----------
@@ -28,6 +30,8 @@ RULE_REGISTRY = {
     "repair_on_recent_inspection": heuristic_repair_on_recent_inspection,
     "monitoring_install_topk": heuristic_monitoring_install_topk,
     "repair_on_window": heuristic_repair_on_window,
+    "repair_on_pf": heuristic_repair_on_pf,
+    "install_sensor": heuristic_install_sensor
 }
 
 # ---------- Utilities ----------
