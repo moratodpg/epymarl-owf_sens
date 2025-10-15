@@ -4,7 +4,7 @@ discount_reward: 1
 component_costs:
   - [0.8, 1.8, 10]
   - [3.8, 7.8, 30]
-global_costs: [1, 100, 600]
+global_costs: [1, 100, 0]
 mobiliz_elements: 5
 pf_constraint: 0.001
 pf_sys_constraint: 1.0
